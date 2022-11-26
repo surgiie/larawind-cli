@@ -4,7 +4,10 @@ LARAWIND_CLI_VERSION="$(cd $LARAWIND_CLI_PATH && git describe --abbrev=0  && cd 
 version=$LARAWIND_CLI_VERSION
 
 ## load the project's .env variables into shell
-set -o allexport
-source .env
-set +o allexport
+if [ -f .env ]
+then
+    set -o allexport
+    source .env
+    set +o allexport
+fi
 
