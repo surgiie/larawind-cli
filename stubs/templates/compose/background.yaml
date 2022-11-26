@@ -1,0 +1,35 @@
+version: "3.8"
+services:
+  scheduler:
+    image: {{ $appImage }}
+    container_name: {{ $dockerTagNamespace }}-scheduler
+    restart: unless-stopped
+    env_file: ../../../.env
+    networks:
+      - {{ $dockerTagNamespace }}-network
+    depends_on:
+      - app
+    volumes:
+      - ../../../:/var/www/html
+    command: >
+        bash -c "
+          echo 'Running scheduler...'
+          while [ true ]; do
+              php /var/www/html/artisan schedule:run --verbose --no-interaction &
+              sleep 60
+          done
+        "
+  queue:
+    image: {{ $appImage }}
+    container_name: {{ $dockerTagNamespace }}-queue
+    restart: unless-stopped
+    networks:
+      - {{ $dockerTagNamespace }}-network
+    depends_on:
+      - app
+    volumes:
+      - ../../../:/var/www/html
+    env_file: ../../../.env
+    command: >
+        bash -c "echo 'Waiting for jobs..' && php /var/www/html/artisan queue:work --verbose --tries=3 --timeout=90"
+        

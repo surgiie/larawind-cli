@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -e
+
+project_larawind_path="$(larawind_path)"
+
+mkdir -p $project_larawind_path
+if [ -d "$project_larawind_path" ] && [ ! -z "$(ls -A $project_larawind_path)" ];
+then
+  warning "The project .larawind directory is already present and not empty."
+fi
+
+stubbed="false"
+stub_path=$(larawind_cli_path stubs)
+for file in $(find $stub_path -type f)
+do
+    relative=$(str_after $file stubs/)
+    absolute=$(larawind_path $relative)
+    directory_name=$(dirname $absolute)
+    
+    if [ ! -f $absolute ] || [[ ${args[--force]} == 1 ]];
+    then
+        stubbed="true"
+
+        # ensure parent directories exist
+        mkdir -p $directory_name
+
+        cp $file $absolute
+
+        info "Generated .larawind/$relative file."
+    fi
+done
+
+if [ $stubbed = "true" ]
+then
+    info "Initialized project .larawind directory."
+else
+    warning "Nothing to initialize. If you want to force overwrite $(bold $(underlined ALL)) files with the defaults, use --force."
+fi
+
+set +e

@@ -1,0 +1,6 @@
+name: composer
+help: Proxy a composer command to the app container.
+filename: commands/composer
+catch_all: "Arbitrary options for the composer."
+filters:
+  - is_laravel_root

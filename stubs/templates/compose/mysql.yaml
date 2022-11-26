@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  mysql:
+    image: {{ $mysqlImage }}
+    container_name: {{ $dockerTagNamespace }}-mysql
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "{{ $dbHostPort }}:3306"
+    volumes:
+      - {{ $dockerTagNamespace }}-mysql:/var/lib/mysql/
+    networks:
+      - {{ $dockerTagNamespace }}-network
+    env_file: ../../../.env
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+    healthcheck: 
+      test: ["CMD-SHELL",  "/usr/bin/mysql --user=${DB_USERNAME} --password=${DB_PASSWORD} --execute \"SHOW DATABASES;\""]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+volumes:
+  {{ $dockerTagNamespace }}-mysql:
+    driver: local

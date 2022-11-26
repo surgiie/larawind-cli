@@ -1,0 +1,14 @@
+name: start
+help: Start up .larawind project services.
+filename: commands/start
+catch_all: "Arbitrary options for the 'docker compose up' command."
+dependencies:
+  - sha1sum
+filters:
+  - is_laravel_root
+  - project_is_initialized
+  - has_env_file
+  - templates_are_rendered
+flags:
+- long: --force-start
+  help: Force start services, ignoring detected changes in rendered dockerfiles.

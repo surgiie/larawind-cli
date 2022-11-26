@@ -1,0 +1,11 @@
+name: set-variable
+help: Set a state variable in the state/variables.json file.
+filename: commands/set-variable
+filters:
+  - is_laravel_root
+  - project_is_initialized
+args:
+- name: name
+  help: The name of the variable.
+- name: value
+  help: The value of the variable.

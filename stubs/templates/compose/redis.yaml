@@ -1,0 +1,22 @@
+version: "3.8"
+services:
+  redis:
+    image: {{ $redisImage }}
+    container_name: {{ $dockerTagNamespace }}-redis
+    restart: unless-stopped
+    env_file: ../../../.env
+    tty: true
+    ports:
+      - "{{ $redisHostPort }}:6379"
+    volumes:
+      - {{ $dockerTagNamespace }}-redis:/data
+    networks:
+      - {{ $dockerTagNamespace }}-network
+    healthcheck: 
+      test: ["CMD-SHELL", 'redis-cli ping']
+      interval: 10s
+      timeout: 2s
+      retries: 10
+volumes:
+  {{ $dockerTagNamespace }}-redis:
+    driver: local

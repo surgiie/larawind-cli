@@ -1,0 +1,41 @@
+
+#!/bin/bash
+
+# This script is called after `larawind up` performs tasks/starts services.
+set -e
+
+# install dependencies 
+larawind composer install
+
+if [ -f "package-lock.json" ]
+then
+    larawind npm ci
+else 
+    larawind npm install
+fi
+
+# generate key if not set
+if [ -z "$APP_KEY" ];
+then
+    larawind artisan key:generate
+fi
+
+namespace=$(get_variable docker_tag_namespace)
+# mysql docker containers might not be ready to accept connections so make sure it's ready before attempting migrate,
+# this health check utilizes the health check defined in mysql.yaml out of the box, customize to liking:
+info "Waiting for mysql to accept connections:"; 
+while [ $(docker inspect --format "{{json .State.Health.Status }}" $namespace-mysql) != "\"healthy\"" ]; 
+do 
+    printf "."; 
+    sleep 3; 
+done
+
+echo "\n"
+
+# customize as needed:
+larawind artisan migrate 
+larawind artisan db:seed 
+larawind artisan queue:restart 
+larawind artisan storage:link
+# larawind npm run build
+# etc

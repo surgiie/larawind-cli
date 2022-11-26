@@ -1,0 +1,16 @@
+name: build
+help: Build the project's docker images from the rendered dockerfiles.
+filename: commands/build
+catch_all: "Arbitrary options for 'docker build' command."
+dependencies:
+  - jq
+  - sha1sum
+  - tr
+  - cut
+filters:
+  - is_laravel_root
+  - project_is_initialized
+  - templates_are_rendered
+flags:
+- long: --rebuild
+  help: Force rebuild images.

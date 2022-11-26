@@ -1,0 +1,19 @@
+name: render
+help: Render the project's available templates.
+filename: commands/render
+catch_all: "Arbitrary options for variable data."
+dependencies:
+  - sha1sum
+filters:
+  - is_laravel_root
+  - project_is_initialized
+  - has_env_file
+flags:
+- long: --rebuild
+  help: Force rebuild larawind/renderer image.
+- long: --force
+  help: Force render files regardless of sha1 sum.
+- long: --remove-image
+  help: Remove the larawind/renderer image after rendering the templates
+- long: --inspect-vars
+  help: Inspect computed/gathered variables with dd.

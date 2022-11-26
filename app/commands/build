@@ -1,0 +1,40 @@
+set -e
+
+hash_json="{}"
+dockerfiles_path="$(larawind_path rendered/dockerfiles)"
+namespace_tag=$(jq -r .docker_tag_namespace $(larawind_path variables.json))
+build_hash_json="$(get_build_hash_file)"
+
+build="false"
+for dockerfile_path in $(find $dockerfiles_path -type f -name *.*.Dockerfile)
+do
+    # get current sum
+    hash=$(sha1sum $dockerfile_path | cut -d ' ' -f 1)
+    # derive tag/image name - split name into parts so we can parse the image name and tag version
+    base_name=$(basename $dockerfile_path)
+    parts=($(echo "$base_name" | tr '.' '\n'))
+    name=${parts[0]}
+    version=${parts[1]}
+    image_name="$namespace_tag/$name:$version"
+
+    # build if force, hash doesnt match, or if the image itself doesnt exist.
+    hash_json=$(insert_json "$hash_json" $base_name $hash)
+    previous_hash=$(echo "$build_hash_json" | jq -r .\"$base_name\")
+    if [[ ${args[--rebuild]} == 1 ]] || [[ $hash != $previous_hash ]] || ! docker_image_exists $image_name;
+    then
+        build="true"
+        cd $dockerfiles_path
+        info "Discovered dockerfile: $base_name, building: $image_name"
+        docker build -f $base_name -t $image_name ${other_args[@]} . --no-cache
+        cd ~-
+    fi
+done
+
+if [ $build == "false" ];
+then
+    warning "No changes detected, nothing to build."
+fi
+
+# write latest state.
+mkdir -p $(larawind_path state)
+echo "$hash_json" > $(larawind_path state/build-sums.json)

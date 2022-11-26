@@ -1,0 +1,11 @@
+name: nuke
+help: Kill .larawind project services and remove all associated resources.
+filename: commands/nuke
+filters:
+  - is_laravel_root
+  - project_is_initialized
+  - has_env_file
+  - templates_are_rendered
+flags:
+- long: --force
+  help: Force run the command.

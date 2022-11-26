@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# helper script to watch for changes and 
+inotifywait -r -m -e modify ./app | while read EV; do
+    jobs -p | xargs kill -9
+    (
+        docker run --rm -i --user $(id -u):$(id -g) --volume "$PWD:/app" dannyben/bashly generate
+        sleep 5  # a placeholder for compiling
+        
+    ) &
+done

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -e
+
+run_hook "before_stop"
+
+## stop services 
+file_args="-f .larawind/rendered/compose/base.yaml"
+services_path="$(larawind_path rendered/compose)"
+env_file=".larawind/rendered/compose/$APP_ENV.env.yaml"
+
+if [ -f $env_file ]
+then
+    info "Discovered service file: $env_file"
+    file_args="$file_args -f $env_file"
+fi
+
+for service_file in $(find $services_path -type f -name *.yaml ! -name base.yaml ! -name $APP_ENV.env.yaml)
+do
+    path=".larawind/$(str_after "$service_file" ".larawind/")"
+    file_args="$file_args -f $path"
+    info "Discovered service file: $path"
+done
+
+docker compose $file_args rm --force --stop ${other_args[@]}
+
+if [ $? -eq 0 ]; then
+    info "Stopped services."
+    run_hook "after_stop"
+fi
+
+set +e

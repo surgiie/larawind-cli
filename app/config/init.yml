@@ -1,0 +1,10 @@
+name: init
+help: Initialize the .larawind directory.
+filename: commands/init
+dependencies:
+  - find
+filters:
+  - is_laravel_root
+flags:
+- long: --force
+  help: Force overwrite existing files.

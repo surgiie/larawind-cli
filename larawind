@@ -1,0 +1,1869 @@
+#!/usr/bin/env bash
+if [ "$#" -eq 0 ] || [[ " $@ " =~ " --help " ]] && [[ " $@ " != *"artisan"* ]] && [[ " $@ " != *"exec"* ]] && [[ " $@ " != *"composer"* ]] && [[ " $@ " != *"npm"* ]]; then
+cat <<EOF
+
+    █   ▄▀█ █▀█ ▄▀█ █ █ █ █ █▄ █ █▀▄
+    █▄▄ █▀█ █▀▄ █▀█ ▀▄▀▄▀ █ █ ▀█ █▄▀
+
+EOF
+fi
+
+version_command() {
+  echo "$version"
+}
+
+larawind_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind - A bash cli for running laravel docker applications with blade rendered configurations.\n"
+    echo
+
+  else
+    printf "larawind - A bash cli for running laravel docker applications with blade rendered configurations.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind COMMAND\n"
+  printf "  larawind [COMMAND] --help | -h\n"
+  printf "  larawind --version | -v\n"
+  echo
+
+  printf "Commands:\n"
+  echo "  init           Initialize the .larawind directory."
+  echo "  render         Render the project's available templates."
+  echo "  build          Build the project's docker images from the rendered dockerfiles."
+  echo "  start          Start up .larawind project services."
+  echo "  stop           Stop service remove service containers."
+  echo "  composer       Proxy a composer command to the app container."
+  echo "  npm            Proxy a npm command to the app container."
+  echo "  nuke           Kill .larawind project services and remove all associated resources."
+  echo "  artisan        Proxy a artisan command to the app container."
+  echo "  exec           Exec command to the a larawind container."
+  echo "  set-variable   Set a state variable in the state/variables.json file."
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+    echo "  --version, -v"
+    printf "    Show version number\n"
+    echo
+
+  fi
+}
+
+larawind_init_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind init - Initialize the .larawind directory.\n"
+    echo
+
+  else
+    printf "larawind init - Initialize the .larawind directory.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind init [OPTIONS]\n"
+  printf "  larawind init --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --force"
+    printf "    Force overwrite existing files.\n"
+    echo
+
+  fi
+}
+
+larawind_render_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind render - Render the project's available templates.\n"
+    echo
+
+  else
+    printf "larawind render - Render the project's available templates.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind render [OPTIONS] [ARBITRARY OPTIONS FOR VARIABLE DATA....]\n"
+  printf "  larawind render --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --rebuild"
+    printf "    Force rebuild larawind/renderer image.\n"
+    echo
+
+    echo "  --force"
+    printf "    Force render files regardless of sha1 sum.\n"
+    echo
+
+    echo "  --remove-image"
+    printf "    Remove the larawind/renderer image after rendering the templates\n"
+    echo
+
+    echo "  --inspect-vars"
+    printf "    Inspect computed/gathered variables with dd.\n"
+    echo
+
+  fi
+}
+
+larawind_build_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind build - Build the project's docker images from the rendered dockerfiles.\n"
+    echo
+
+  else
+    printf "larawind build - Build the project's docker images from the rendered dockerfiles.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind build [OPTIONS] [ARBITRARY OPTIONS FOR 'DOCKER BUILD' COMMAND....]\n"
+  printf "  larawind build --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --rebuild"
+    printf "    Force rebuild images.\n"
+    echo
+
+  fi
+}
+
+larawind_start_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind start - Start up .larawind project services.\n"
+    echo
+
+  else
+    printf "larawind start - Start up .larawind project services.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind start [OPTIONS] [ARBITRARY OPTIONS FOR THE 'DOCKER COMPOSE UP' COMMAND....]\n"
+  printf "  larawind start --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --force-start"
+    printf "    Force start services, ignoring detected changes in rendered dockerfiles.\n"
+    echo
+
+  fi
+}
+
+larawind_stop_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind stop - Stop service remove service containers.\n"
+    echo
+
+  else
+    printf "larawind stop - Stop service remove service containers.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind stop [ARBITRARY OPTIONS FOR THE 'DOCKER COMPOSE STOP' COMMAND....]\n"
+  printf "  larawind stop --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+  fi
+}
+
+larawind_composer_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind composer - Proxy a composer command to the app container.\n"
+    echo
+
+  else
+    printf "larawind composer - Proxy a composer command to the app container.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind composer [ARBITRARY OPTIONS FOR THE COMPOSER....]\n"
+  printf "  larawind composer --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+  fi
+}
+
+larawind_npm_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind npm - Proxy a npm command to the app container.\n"
+    echo
+
+  else
+    printf "larawind npm - Proxy a npm command to the app container.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind npm [ARBITRARY OPTIONS FOR THE NPM....]\n"
+  printf "  larawind npm --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+  fi
+}
+
+larawind_nuke_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind nuke - Kill .larawind project services and remove all associated resources.\n"
+    echo
+
+  else
+    printf "larawind nuke - Kill .larawind project services and remove all associated resources.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind nuke [OPTIONS]\n"
+  printf "  larawind nuke --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --force"
+    printf "    Force run the command.\n"
+    echo
+
+  fi
+}
+
+larawind_artisan_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind artisan - Proxy a artisan command to the app container.\n"
+    echo
+
+  else
+    printf "larawind artisan - Proxy a artisan command to the app container.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind artisan [ARBITRARY OPTIONS FOR THE ARTISAN....]\n"
+  printf "  larawind artisan --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+  fi
+}
+
+larawind_exec_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind exec - Exec command to the a larawind container.\n"
+    echo
+
+  else
+    printf "larawind exec - Exec command to the a larawind container.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind exec [CONTAINER] [OPTIONS] [ARBITRARY COMMAND AND OPTIONS FOR THE EXEC....]\n"
+  printf "  larawind exec --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --cmd CMD"
+    printf "    The command to exec.\n"
+    printf "    Default: bash\n"
+    echo
+
+    printf "Arguments:\n"
+
+    echo "  CONTAINER"
+    printf "\n"
+    printf "    Default: app\n"
+    echo
+
+  fi
+}
+
+larawind_set_variable_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind set-variable - Set a state variable in the state/variables.json file.\n"
+    echo
+
+  else
+    printf "larawind set-variable - Set a state variable in the state/variables.json file.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind set-variable [NAME] [VALUE]\n"
+  printf "  larawind set-variable --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    printf "Arguments:\n"
+
+    echo "  NAME"
+    printf "    The name of the variable.\n"
+    echo
+
+    echo "  VALUE"
+    printf "    The value of the variable.\n"
+    echo
+
+  fi
+}
+
+normalize_input() {
+  local arg flags
+
+  while [[ $# -gt 0 ]]; do
+    arg="$1"
+    if [[ $arg =~ ^(--[a-zA-Z0-9_\-]+)=(.+)$ ]]; then
+      input+=("${BASH_REMATCH[1]}")
+      input+=("${BASH_REMATCH[2]}")
+    elif [[ $arg =~ ^(-[a-zA-Z0-9])=(.+)$ ]]; then
+      input+=("${BASH_REMATCH[1]}")
+      input+=("${BASH_REMATCH[2]}")
+    else
+      input+=("$arg")
+    fi
+
+    shift
+  done
+}
+
+inspect_args() {
+  readarray -t sorted_keys < <(printf '%s\n' "${!args[@]}" | sort)
+  if (( ${#args[@]} )); then
+    echo args:
+    for k in "${sorted_keys[@]}"; do echo "- \${args[$k]} = ${args[$k]}"; done
+  else
+    echo args: none
+  fi
+
+  if (( ${#other_args[@]} )); then
+    echo
+    echo other_args:
+    echo "- \${other_args[*]} = ${other_args[*]}"
+    for i in "${!other_args[@]}"; do
+      echo "- \${other_args[$i]} = ${other_args[$i]}"
+    done
+  fi
+}
+
+print_in_color() {
+  local color="$1"
+  shift
+  if [[ -z ${NO_COLOR+x} ]]; then
+    printf "$color%b\e[0m\n" "$*";
+  else
+    printf "%b\n" "$*";
+  fi
+}
+
+red() { print_in_color "\e[31m" "$*"; }
+green() { print_in_color "\e[32m" "$*"; }
+yellow() { print_in_color "\e[33m" "$*"; }
+blue() { print_in_color "\e[34m" "$*"; }
+magenta() { print_in_color "\e[35m" "$*"; }
+cyan() { print_in_color "\e[36m" "$*"; }
+bold() { print_in_color "\e[1m" "$*"; }
+underlined() { print_in_color "\e[4m" "$*"; }
+red_bold() { print_in_color "\e[1;31m" "$*"; }
+green_bold() { print_in_color "\e[1;32m" "$*"; }
+yellow_bold() { print_in_color "\e[1;33m" "$*"; }
+blue_bold() { print_in_color "\e[1;34m" "$*"; }
+magenta_bold() { print_in_color "\e[1;35m" "$*"; }
+cyan_bold() { print_in_color "\e[1;36m" "$*"; }
+red_underlined() { print_in_color "\e[4;31m" "$*"; }
+green_underlined() { print_in_color "\e[4;32m" "$*"; }
+yellow_underlined() { print_in_color "\e[4;33m" "$*"; }
+blue_underlined() { print_in_color "\e[4;34m" "$*"; }
+magenta_underlined() { print_in_color "\e[4;35m" "$*"; }
+cyan_underlined() { print_in_color "\e[4;36m" "$*"; }
+
+error(){
+    echo "$(red_bold [ERROR])[$(date +'%I:%M:%S %p')]: $1"
+}
+
+warning(){
+    echo "$(yellow_bold [WARNING])[$(date +'%I:%M:%S %p')]: $1"
+}
+info(){
+    echo "$(cyan_bold [INFO])[$(date +'%I:%M:%S %p')]: $1"
+}
+
+filter_docker_running() {
+    docker info >/dev/null 2>&1 || echo "Docker must be running"
+}
+
+filter_is_laravel_root() {
+    if [ ! -f 'composer.json' ] || ! grep -q "laravel/framework" "composer.json"; then
+        echo "$(error "Current directory is not a laravel/framework context.")"
+    fi
+}
+
+filter_has_env_file() {
+    if [ ! -f '.env' ]; then
+        echo "$(error "The project .env file is missing.")"
+    fi
+}
+
+filter_project_is_initialized() {
+    project_larawind_path="$(larawind_path)"
+
+    if [ ! -d "$project_larawind_path" ] || [ -z "$(ls -A $project_larawind_path)" ]; then
+        warning "The project .larawind directory does not appear initialized. Did you run 'larawind init'?"
+    fi
+}
+
+filter_templates_are_rendered() {
+    rendered_path="$(larawind_path rendered)"
+    if [ ! -d "$rendered_path" ] || [ -z "$(ls -A $rendered_path)" ]; then
+        warning "Templates have not been rendered to .larawind/rendered"
+    fi
+}
+
+remove_trailing() {
+    value="$1"
+    char="$2"
+    echo ${value%"$char"}
+}
+remove_leading() {
+    value="$1"
+    char="$2"
+    echo ${value#"$char"}
+}
+
+str_after(){
+    value="$1"
+    substring="$2"
+    echo ${value##*$substring}
+}
+str_before(){
+    value="$1"
+    substring="$2"
+    echo ${value%$substring*}
+}
+
+larawind_path() {
+    path="${1:-/}"
+    base="$(pwd)/.larawind"
+    path=$(remove_leading "$path" "/")
+    path=$(remove_trailing "$path" "/")
+    path="$base/$path"
+    echo $(remove_trailing "$path" "/")
+}
+
+larawind_cli_path() {
+    path="${1:-/}"
+    base="$LARAWIND_CLI_PATH"
+    path=$(remove_leading "$path" "/")
+    path=$(remove_trailing "$path" "/")
+    path="$base/$path"
+    echo $(remove_trailing "$path" "/")
+}
+
+docker_image_exists() {
+  if  [ ! -z "$(docker images -q $1)" ]
+  then
+    true
+  else
+    false
+  fi
+}
+
+insert_json(){
+    echo "$(jq -n --arg data "$1" --arg key "$2" --arg value "$3" '$data | fromjson + { ($key) : ($value) }')"
+}
+
+run_hook(){
+    if [ -f ".larawind/hooks/$1" ] && [ -x ".larawind/hooks/$1" ];
+    then
+        info "Executing hook: $1"
+
+        . .larawind/hooks/$1
+    fi
+}
+
+get_variable(){
+    var="null"
+    if [ -f $(larawind_path state/variables.json) ]
+    then
+        value=$(jq -r .$1 $(larawind_path state/variables.json))
+        if [ $value == "null" ]
+        then
+            value=$(jq -r .$1 $(larawind_path variables.json))
+        fi
+    else
+        value=$(jq -r .$1 $(larawind_path variables.json))
+    fi
+    echo $value
+
+}
+
+get_build_hash_file(){
+    build_state_hash_filepath=$(larawind_path state/build-sums.json)
+
+    if [ -f $build_state_hash_filepath ];
+    then
+        previous_hash_json="$(jq . $build_state_hash_filepath)"
+    else
+        previous_hash_json="{}"
+    fi
+
+    echo "$previous_hash_json"
+}
+
+get_set_variables_file(){
+    variable_state_file=$(larawind_path state/variables.json)
+
+    [ -f $variable_state_file ] || echo "{}" > $variable_state_file
+
+    if [ -f $variable_state_file ];
+    then
+        vars_json="$(jq . $variable_state_file)"
+    else
+        vars_json="{}"
+    fi
+
+    echo "$vars_json"
+}
+
+larawind_init_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  project_larawind_path="$(larawind_path)"
+
+  mkdir -p $project_larawind_path
+  if [ -d "$project_larawind_path" ] && [ ! -z "$(ls -A $project_larawind_path)" ];
+  then
+    warning "The project .larawind directory is already present and not empty."
+  fi
+
+  stubbed="false"
+  stub_path=$(larawind_cli_path stubs)
+  for file in $(find $stub_path -type f)
+  do
+      relative=$(str_after $file stubs/)
+      absolute=$(larawind_path $relative)
+      directory_name=$(dirname $absolute)
+
+      if [ ! -f $absolute ] || [[ ${args[--force]} == 1 ]];
+      then
+          stubbed="true"
+
+          # ensure parent directories exist
+          mkdir -p $directory_name
+
+          cp $file $absolute
+
+          info "Generated .larawind/$relative file."
+      fi
+  done
+
+  if [ $stubbed = "true" ]
+  then
+      info "Initialized project .larawind directory."
+  else
+      warning "Nothing to initialize. If you want to force overwrite $(bold $(underlined ALL)) files with the defaults, use --force."
+  fi
+
+  set +e
+}
+
+larawind_render_command() {
+  #!/usr/bin/env bash
+  set -e
+  templates_path="$(larawind_path templates)"
+
+  if [ ! -d "$templates_path" ] && [ -z "$(ls -A $templates_path)" ];
+  then
+    warning "No templates available in .larawind/templates directory, nothing to process."
+    exit 1;
+  fi
+
+  image_version="$(echo $LARAWIND_CLI_VERSION | cut -c 2- )"
+  image_name="larawind/renderer:$image_version"
+
+  if [[ ${args[--rebuild]} == 1 ]] || ! docker_image_exists $image_name;
+  then
+      info "Building the $image_name image."
+      docker_file_path=$(larawind_cli_path renderer)
+      cd $docker_file_path
+      docker build -t "$image_name" . --no-cache
+      cd ~-
+  fi
+
+  if [ -z ${other_args+x} ];
+  then
+      other_args=""
+  fi
+
+  renderer_path=$(larawind_cli_path renderer)
+
+  cd $renderer_path
+  docker run --rm -it --user $(id -u):$(id -g) --volume $(pwd):/app composer:2.4.4 install
+  cd ~-
+
+  if [[ ${args[--force]} == 1 ]]
+  then
+      other_args+=("--force")
+  fi
+  if [[ ${args[--inspect-vars]} == 1 ]]
+  then
+      other_args+=("--inspect-vars")
+  fi
+
+  docker run --rm -it --user $(id -u):$(id -g) \
+      --volume "$PWD/.larawind:/app" \
+      --volume "$PWD/.env:/app/.env" \
+      --volume "$renderer_path/vendor:/app/vendor" \
+      --volume "$renderer_path/render:/app/render" \
+      --volume /etc/localtime:/etc/localtime:ro \
+      $image_name \
+      ${other_args[@]}
+
+  # cleanup files from docker's 2 way binding from volumes
+  rm -f $(larawind_path render)
+  rm -rf $(larawind_path vendor)
+  rm -f $(larawind_path .env)
+
+  if [[ ${args[--remove-image]} == 1 ]]
+  then
+      docker rmi $image_name
+      info "Removed image: $image_name"
+  fi
+
+  set +e
+}
+
+larawind_build_command() {
+  set -e
+
+  hash_json="{}"
+  dockerfiles_path="$(larawind_path rendered/dockerfiles)"
+  namespace_tag=$(jq -r .docker_tag_namespace $(larawind_path variables.json))
+  build_hash_json="$(get_build_hash_file)"
+
+  build="false"
+  for dockerfile_path in $(find $dockerfiles_path -type f -name *.*.Dockerfile)
+  do
+      # get current sum
+      hash=$(sha1sum $dockerfile_path | cut -d ' ' -f 1)
+      # derive tag/image name - split name into parts so we can parse the image name and tag version
+      base_name=$(basename $dockerfile_path)
+      parts=($(echo "$base_name" | tr '.' '\n'))
+      name=${parts[0]}
+      version=${parts[1]}
+      image_name="$namespace_tag/$name:$version"
+
+      # build if force, hash doesnt match, or if the image itself doesnt exist.
+      hash_json=$(insert_json "$hash_json" $base_name $hash)
+      previous_hash=$(echo "$build_hash_json" | jq -r .\"$base_name\")
+      if [[ ${args[--rebuild]} == 1 ]] || [[ $hash != $previous_hash ]] || ! docker_image_exists $image_name;
+      then
+          build="true"
+          cd $dockerfiles_path
+          info "Discovered dockerfile: $base_name, building: $image_name"
+          docker build -f $base_name -t $image_name ${other_args[@]} . --no-cache
+          cd ~-
+      fi
+  done
+
+  if [ $build == "false" ];
+  then
+      warning "No changes detected, nothing to build."
+  fi
+
+  # write latest state.
+  mkdir -p $(larawind_path state)
+  echo "$hash_json" > $(larawind_path state/build-sums.json)
+
+}
+
+larawind_start_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  run_hook "before_start"
+
+  dockerfiles_path="$(larawind_path rendered/dockerfiles)"
+  build_hash_json="$(get_build_hash_file)"
+
+  has_build_changes="false"
+  for dockerfile_path in $(find $dockerfiles_path -type f -name *.*.Dockerfile)
+  do
+      hash=$(sha1sum $dockerfile_path | cut -d ' ' -f 1)
+      base_name=$(basename $dockerfile_path)
+      previous_hash=$(echo "$build_hash_json" | jq -r .\"$base_name\")
+      if [[ $hash != $previous_hash ]];
+      then
+          warning "Detected dockefile changes that may not be built in: $base_name"
+          has_build_changes="true"
+      fi
+  done
+
+  if [ $has_build_changes == 'true' ] && [[ ${args[--force-start]} != 1 ]];
+  then
+      warning "There appears to be changes to your rendered dockerfiles that are not built, do you want to start up services anyways? (y|Y)"
+      read -p "" -n 1 -r
+      echo
+
+      if [[ ! $REPLY =~ ^[Yy]$ ]]
+      then
+          red "Aborted."
+          exit 1
+      fi
+  fi
+
+  file_args="-f .larawind/rendered/compose/base.yaml"
+  services_path="$(larawind_path rendered/compose)"
+  env_file=".larawind/rendered/compose/$APP_ENV.env.yaml"
+
+  if [ -f $env_file ]
+  then
+      info "Discovered service file: $env_file"
+      file_args="$file_args -f $env_file"
+  fi
+
+  for service_file in $(find $services_path -type f -name *.yaml ! -name base.yaml ! -name $APP_ENV.env.yaml)
+  do
+      path=".larawind/$(str_after "$service_file" ".larawind/")"
+      file_args="$file_args -f $path"
+      info "Discovered service file: $path"
+  done
+
+  docker compose $file_args up -d  ${other_args[@]}
+
+  if [ $? -eq 0 ]; then
+      info "Started services."
+      run_hook "after_start"
+  fi
+
+  set +e
+}
+
+larawind_stop_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  run_hook "before_stop"
+
+
+  file_args="-f .larawind/rendered/compose/base.yaml"
+  services_path="$(larawind_path rendered/compose)"
+  env_file=".larawind/rendered/compose/$APP_ENV.env.yaml"
+
+  if [ -f $env_file ]
+  then
+      info "Discovered service file: $env_file"
+      file_args="$file_args -f $env_file"
+  fi
+
+  for service_file in $(find $services_path -type f -name *.yaml ! -name base.yaml ! -name $APP_ENV.env.yaml)
+  do
+      path=".larawind/$(str_after "$service_file" ".larawind/")"
+      file_args="$file_args -f $path"
+      info "Discovered service file: $path"
+  done
+
+  docker compose $file_args rm --force --stop ${other_args[@]}
+
+  if [ $? -eq 0 ]; then
+      info "Stopped services."
+      run_hook "after_stop"
+  fi
+
+  set +e
+}
+
+larawind_composer_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  namespace=$(get_variable docker_tag_namespace)
+
+  test -t 1 && USE_TTY="-t"
+
+  docker exec -i ${USE_TTY} $namespace-app composer ${other_args[@]}
+
+  set +e
+}
+
+larawind_npm_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  namespace=$(get_variable docker_tag_namespace)
+
+  test -t 1 && USE_TTY="-t"
+
+  docker exec -i ${USE_TTY} $namespace-app npm ${other_args[@]}
+
+  set +e
+}
+
+larawind_nuke_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  run_hook "before_nuke"
+
+  if [ $APP_ENV != "local" ] && [[ ${args[--force]} != 1 ]];
+  then
+      warning "Your application env is '$APP_ENV', This will remove $(underlined $(bold ALL)) compose services, volumes and images, Are you sure? (y|Y)"
+      read -p "" -n 1 -r
+      echo
+
+      if [[ ! $REPLY =~ ^[Yy]$ ]]
+      then
+          red "Aborted."
+          exit 1
+      fi
+  fi
+
+  file_args="-f .larawind/rendered/compose/app.yaml"
+  services_path="$(larawind_path rendered/compose)"
+  env_file=".larawind/rendered/compose/$APP_ENV.env.yaml"
+
+  if [ -f $env_file ]
+  then
+      info "Discovered service file: $env_file"
+      file_args="$file_args -f $env_file"
+  fi
+
+  for service_file in $(find $services_path -type f -name *.yaml ! -name app.yaml ! -name $APP_ENV.env.yaml)
+  do
+      path=".larawind/$(str_after "$service_file" ".larawind/")"
+      file_args="$file_args -f $path"
+      info "Discovered service file: $path"
+  done
+
+  docker compose $file_args down --rmi all -v ${other_args[@]}
+
+  if [ $? -eq 0 ]; then
+      info "Nuked services. Consider running 'docker system prune' to remove dangling resources."
+      run_hook "after_nuke"
+  fi
+
+  set +e
+}
+
+larawind_artisan_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  namespace=$(get_variable docker_tag_namespace)
+
+  test -t 1 && USE_TTY="-t"
+
+  docker exec -i ${USE_TTY} $namespace-app php artisan ${other_args[@]}
+
+  set +e
+}
+
+larawind_exec_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  namespace=$(get_variable docker_tag_namespace)
+  container=${args[container]}
+  container="$namespace-$(str_after $container $namespace-)"
+
+  test -t 1 && USE_TTY="-t"
+
+  cmd=${args[--cmd]}
+
+  info "Running '$cmd' on $container:"
+
+  docker exec -i ${USE_TTY} $container $cmd
+
+  set +e
+}
+
+larawind_set_variable_command() {
+  #!/usr/bin/env bash
+  set -e
+
+  mkdir -p $(larawind_path state)
+
+  state_vars=$(get_set_variables_file)
+  state_vars=$(insert_json "$state_vars" "${args[name]}" "${args[value]}")
+
+  info "Set ${args[name]} state variable to ${args[value]}"
+
+  echo "$state_vars" > $(larawind_path state/variables.json)
+
+  set +e
+}
+
+parse_requirements() {
+
+  case "${1:-}" in
+  --version | -v )
+    version_command
+    exit
+    ;;
+
+  --help | -h )
+    long_usage=yes
+    larawind_usage
+    exit
+    ;;
+
+  esac
+
+  action=${1:-}
+
+  case $action in
+  -* )
+    ;;
+
+  init )
+    action="init"
+    shift
+    larawind_init_parse_requirements "$@"
+    shift $#
+    ;;
+
+  render )
+    action="render"
+    shift
+    larawind_render_parse_requirements "$@"
+    shift $#
+    ;;
+
+  build )
+    action="build"
+    shift
+    larawind_build_parse_requirements "$@"
+    shift $#
+    ;;
+
+  start )
+    action="start"
+    shift
+    larawind_start_parse_requirements "$@"
+    shift $#
+    ;;
+
+  stop )
+    action="stop"
+    shift
+    larawind_stop_parse_requirements "$@"
+    shift $#
+    ;;
+
+  composer )
+    action="composer"
+    shift
+    larawind_composer_parse_requirements "$@"
+    shift $#
+    ;;
+
+  npm )
+    action="npm"
+    shift
+    larawind_npm_parse_requirements "$@"
+    shift $#
+    ;;
+
+  nuke )
+    action="nuke"
+    shift
+    larawind_nuke_parse_requirements "$@"
+    shift $#
+    ;;
+
+  artisan )
+    action="artisan"
+    shift
+    larawind_artisan_parse_requirements "$@"
+    shift $#
+    ;;
+
+  exec )
+    action="exec"
+    shift
+    larawind_exec_parse_requirements "$@"
+    shift $#
+    ;;
+
+  set-variable )
+    action="set-variable"
+    shift
+    larawind_set_variable_parse_requirements "$@"
+    shift $#
+    ;;
+
+  "" )
+    larawind_usage >&2
+    exit 1
+    ;;
+
+  * )
+    printf "invalid command: %s\n" "$action" >&2
+    exit 1
+    ;;
+
+  esac
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      printf "invalid option: %s\n" "$key" >&2
+      exit 1
+      ;;
+
+    * )
+
+      printf "invalid argument: %s\n" "$key" >&2
+      exit 1
+
+      ;;
+
+    esac
+  done
+
+}
+
+larawind_init_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_init_usage
+    exit
+    ;;
+
+  esac
+
+  if ! [[ -x "$(command -v find)" ]]; then
+    printf "missing dependency: find\n" >&2
+    exit 1
+  fi
+
+  action="init"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --force )
+
+      args[--force]=1
+      shift
+      ;;
+
+    -?* )
+      printf "invalid option: %s\n" "$key" >&2
+      exit 1
+      ;;
+
+    * )
+
+      printf "invalid argument: %s\n" "$key" >&2
+      exit 1
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_render_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_render_usage
+    exit
+    ;;
+
+  esac
+
+  if ! [[ -x "$(command -v sha1sum)" ]]; then
+    printf "missing dependency: sha1sum\n" >&2
+    exit 1
+  fi
+
+  action="render"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --rebuild )
+
+      args[--rebuild]=1
+      shift
+      ;;
+
+    --force )
+
+      args[--force]=1
+      shift
+      ;;
+
+    --remove-image )
+
+      args[--remove-image]=1
+      shift
+      ;;
+
+    --inspect-vars )
+
+      args[--inspect-vars]=1
+      shift
+      ;;
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_has_env_file)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_build_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_build_usage
+    exit
+    ;;
+
+  esac
+
+  if ! [[ -x "$(command -v jq)" ]]; then
+    printf "missing dependency: jq\n" >&2
+    exit 1
+  fi
+  if ! [[ -x "$(command -v sha1sum)" ]]; then
+    printf "missing dependency: sha1sum\n" >&2
+    exit 1
+  fi
+  if ! [[ -x "$(command -v tr)" ]]; then
+    printf "missing dependency: tr\n" >&2
+    exit 1
+  fi
+  if ! [[ -x "$(command -v cut)" ]]; then
+    printf "missing dependency: cut\n" >&2
+    exit 1
+  fi
+
+  action="build"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --rebuild )
+
+      args[--rebuild]=1
+      shift
+      ;;
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_templates_are_rendered)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_start_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_start_usage
+    exit
+    ;;
+
+  esac
+
+  if ! [[ -x "$(command -v sha1sum)" ]]; then
+    printf "missing dependency: sha1sum\n" >&2
+    exit 1
+  fi
+
+  action="start"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --force-start )
+
+      args[--force-start]=1
+      shift
+      ;;
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_has_env_file)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_templates_are_rendered)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_stop_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_stop_usage
+    exit
+    ;;
+
+  esac
+
+  action="stop"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_has_env_file)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_templates_are_rendered)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_composer_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_composer_usage
+    exit
+    ;;
+
+  esac
+
+  action="composer"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_npm_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_npm_usage
+    exit
+    ;;
+
+  esac
+
+  action="npm"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_nuke_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_nuke_usage
+    exit
+    ;;
+
+  esac
+
+  action="nuke"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --force )
+
+      args[--force]=1
+      shift
+      ;;
+
+    -?* )
+      printf "invalid option: %s\n" "$key" >&2
+      exit 1
+      ;;
+
+    * )
+
+      printf "invalid argument: %s\n" "$key" >&2
+      exit 1
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_has_env_file)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_templates_are_rendered)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_artisan_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_artisan_usage
+    exit
+    ;;
+
+  esac
+
+  action="artisan"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      other_args+=("$1")
+      shift
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_exec_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_exec_usage
+    exit
+    ;;
+
+  esac
+
+  action="exec"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --cmd )
+
+      if [[ -n ${2+x} ]]; then
+
+        args[--cmd]="$2"
+        shift
+        shift
+      else
+        printf "%s\n" "--cmd requires an argument: --cmd CMD" >&2
+        exit 1
+      fi
+      ;;
+
+    -?* )
+      other_args+=("$1")
+      shift
+      ;;
+
+    * )
+
+      if [[ -z ${args[container]+x} ]]; then
+
+        args[container]=$1
+        shift
+      else
+        other_args+=("$1")
+        shift
+      fi
+
+      ;;
+
+    esac
+  done
+
+  [[ -n ${args[container]:-} ]] || args[container]="app"
+  [[ -n ${args[--cmd]:-} ]] || args[--cmd]="bash"
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+larawind_set_variable_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_set_variable_usage
+    exit
+    ;;
+
+  esac
+
+  action="set-variable"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    -?* )
+      printf "invalid option: %s\n" "$key" >&2
+      exit 1
+      ;;
+
+    * )
+
+      if [[ -z ${args[name]+x} ]]; then
+
+        args[name]=$1
+        shift
+      elif [[ -z ${args[value]+x} ]]; then
+
+        args[value]=$1
+        shift
+      else
+        printf "invalid argument: %s\n" "$key" >&2
+        exit 1
+      fi
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
+initialize() {
+  version=""
+  long_usage=''
+  set -e
+
+  LARAWIND_CLI_PATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+  LARAWIND_CLI_VERSION="$(cd $LARAWIND_CLI_PATH && git describe --abbrev=0  && cd ~-)"
+  version=$LARAWIND_CLI_VERSION
+
+  set -o allexport
+  source .env
+  set +o allexport
+
+}
+
+run() {
+  declare -A args=()
+  declare -a other_args=()
+  declare -a input=()
+  normalize_input "$@"
+  parse_requirements "${input[@]}"
+
+  if [[ $action == "init" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_init_usage
+    else
+      larawind_init_command
+    fi
+
+  elif [[ $action == "render" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_render_usage
+    else
+      larawind_render_command
+    fi
+
+  elif [[ $action == "build" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_build_usage
+    else
+      larawind_build_command
+    fi
+
+  elif [[ $action == "start" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_start_usage
+    else
+      larawind_start_command
+    fi
+
+  elif [[ $action == "stop" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_stop_usage
+    else
+      larawind_stop_command
+    fi
+
+  elif [[ $action == "composer" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_composer_usage
+    else
+      larawind_composer_command
+    fi
+
+  elif [[ $action == "npm" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_npm_usage
+    else
+      larawind_npm_command
+    fi
+
+  elif [[ $action == "nuke" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_nuke_usage
+    else
+      larawind_nuke_command
+    fi
+
+  elif [[ $action == "artisan" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_artisan_usage
+    else
+      larawind_artisan_command
+    fi
+
+  elif [[ $action == "exec" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_exec_usage
+    else
+      larawind_exec_command
+    fi
+
+  elif [[ $action == "set-variable" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_set_variable_usage
+    else
+      larawind_set_variable_command
+    fi
+
+  elif [[ $action == "root" ]]; then
+    root_command
+  fi
+}
+
+initialize
+run "$@"

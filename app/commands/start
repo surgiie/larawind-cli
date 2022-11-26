@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -e
+
+run_hook "before_start"
+
+dockerfiles_path="$(larawind_path rendered/dockerfiles)"
+build_hash_json="$(get_build_hash_file)"
+
+
+has_build_changes="false"
+for dockerfile_path in $(find $dockerfiles_path -type f -name *.*.Dockerfile)
+do
+    hash=$(sha1sum $dockerfile_path | cut -d ' ' -f 1)
+    base_name=$(basename $dockerfile_path)
+    previous_hash=$(echo "$build_hash_json" | jq -r .\"$base_name\")
+    if [[ $hash != $previous_hash ]];
+    then
+        warning "Detected dockefile changes that may not be built in: $base_name"
+        has_build_changes="true"
+    fi
+done
+
+## confirm start if changes for dockerfiles are detected.
+if [ $has_build_changes == 'true' ] && [[ ${args[--force-start]} != 1 ]];
+then
+    warning "There appears to be changes to your rendered dockerfiles that are not built, do you want to start up services anyways? (y|Y)"
+    read -p "" -n 1 -r
+    echo   
+    if [[ ! $REPLY =~ ^[Yy]$ ]]
+    then
+        red "Aborted."
+        exit 1
+    fi
+fi
+## start services 
+file_args="-f .larawind/rendered/compose/base.yaml"
+services_path="$(larawind_path rendered/compose)"
+env_file=".larawind/rendered/compose/$APP_ENV.env.yaml"
+
+if [ -f $env_file ]
+then
+    info "Discovered service file: $env_file"
+    file_args="$file_args -f $env_file"
+fi
+
+for service_file in $(find $services_path -type f -name *.yaml ! -name base.yaml ! -name $APP_ENV.env.yaml)
+do
+    path=".larawind/$(str_after "$service_file" ".larawind/")"
+    file_args="$file_args -f $path"
+    info "Discovered service file: $path"
+done
+
+
+docker compose $file_args up -d  ${other_args[@]}
+
+if [ $? -eq 0 ]; then
+    info "Started services."
+    run_hook "after_start"
+fi
+
+set +e

@@ -1,0 +1,12 @@
+{
+    "domain": "larawind.local",
+    "docker_tag_namespace": "larawind",
+    "docker_username": "larawind",
+    "docker_user_uid": "1000",
+    "docker_ssl_directory": "/var/www/ssl",
+    "nginx_host_http_port": "80",
+    "nginx_host_https_port": "443",
+    "redis_host_port": "6379",
+    "db_host_port": "3306",
+    "test_db_host_port": "3307"
+}

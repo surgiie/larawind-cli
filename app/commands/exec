@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -e
+
+namespace=$(get_variable docker_tag_namespace)
+container=${args[container]}
+container="$namespace-$(str_after $container $namespace-)"
+
+test -t 1 && USE_TTY="-t" 
+
+cmd=${args[--cmd]}
+
+info "Running '$cmd' on $container:"
+
+docker exec -i ${USE_TTY} $container $cmd
+
+set +e

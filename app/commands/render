@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -e
+templates_path="$(larawind_path templates)"
+
+if [ ! -d "$templates_path" ] && [ -z "$(ls -A $templates_path)" ];
+then
+  warning "No templates available in .larawind/templates directory, nothing to process."
+  exit 1;
+fi
+
+
+image_version="$(echo $LARAWIND_CLI_VERSION | cut -c 2- )"
+image_name="larawind/renderer:$image_version"
+
+if [[ ${args[--rebuild]} == 1 ]] || ! docker_image_exists $image_name;
+then
+    info "Building the $image_name image."
+    docker_file_path=$(larawind_cli_path renderer)
+    cd $docker_file_path
+    docker build -t "$image_name" . --no-cache
+    cd ~-
+fi
+
+if [ -z ${other_args+x} ];
+then
+    other_args=""
+fi
+
+renderer_path=$(larawind_cli_path renderer)
+
+cd $renderer_path
+docker run --rm -it --user $(id -u):$(id -g) --volume $(pwd):/app composer:2.4.4 install
+cd ~-
+
+if [[ ${args[--force]} == 1 ]]
+then
+    other_args+=("--force")
+fi
+if [[ ${args[--inspect-vars]} == 1 ]]
+then
+    other_args+=("--inspect-vars")
+fi
+
+docker run --rm -it --user $(id -u):$(id -g) \
+    --volume "$PWD/.larawind:/app" \
+    --volume "$PWD/.env:/app/.env" \
+    --volume "$renderer_path/vendor:/app/vendor" \
+    --volume "$renderer_path/render:/app/render" \
+    --volume /etc/localtime:/etc/localtime:ro \
+    $image_name \
+    ${other_args[@]}
+
+# cleanup files from docker's 2 way binding from volumes
+rm -f $(larawind_path render)
+rm -rf $(larawind_path vendor)
+rm -f $(larawind_path .env)
+
+if [[ ${args[--remove-image]} == 1 ]]
+then
+    docker rmi $image_name
+    info "Removed image: $image_name"
+fi
+
+set +e

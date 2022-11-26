@@ -1,0 +1,15 @@
+name: larawind
+help: A bash cli for running laravel docker applications with blade rendered configurations.
+commands:
+  - import: app/config/init.yml
+  - import: app/config/render.yml
+  - import: app/config/build.yml
+  - import: app/config/start.yml
+  - import: app/config/stop.yml
+  - import: app/config/composer.yml
+  - import: app/config/npm.yml
+  - import: app/config/nuke.yml
+  - import: app/config/artisan.yml
+  - import: app/config/exec.yml
+  - import: app/config/set-variable.yml
+

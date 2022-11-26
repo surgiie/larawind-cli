@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -e
+
+namespace=$(get_variable docker_tag_namespace)
+
+test -t 1 && USE_TTY="-t" 
+
+docker exec -i ${USE_TTY} $namespace-app npm ${other_args[@]}
+
+set +e

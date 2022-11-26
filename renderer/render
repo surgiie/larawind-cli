@@ -1,0 +1,173 @@
+#!/usr/bin/env php
+<?php
+
+use Dotenv\Dotenv;
+use Surgiie\Blade\Blade;
+use Illuminate\Support\Str;
+use Illuminate\Container\Container;
+use Symfony\Component\Finder\Finder;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Arr;
+
+require __DIR__.'/vendor/autoload.php';
+
+// helpers for output 
+/**Display a warning message.*/
+function warning(string $message){
+    $time = date('h:i:s A');
+    echo "\033[93m[WARNING]\033[0m[$time]: $message\n";
+}
+/**Display a info message.*/
+function info(string $message){
+    $time = date('h:i:s A');
+    echo "\033[36m[INFO]\033[0m[$time]: $message\n";
+}
+/*
+|--------------------------------------------------------------------------
+| Gather state/prepare initial variables.
+|--------------------------------------------------------------------------
+*/
+$commandLineVars = [];
+$changes = false;
+$latestHashes = [];
+$savedHashes = [];
+
+$previousVariableHash = is_file('state/variable-sum.json') ? json_decode(file_get_contents('state/variable-sum.json'), true)['sum'] : null; 
+
+if(is_file($hashFile = "state/render-sums.json")){
+    $savedHashes = json_decode(file_get_contents($hashFile), true);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Parse passed in command line arguments for variable data.
+|--------------------------------------------------------------------------
+*/
+array_shift($argv);
+$parsedOptions = explode(" ", str_replace("=--", " --", implode("=", $argv)));
+foreach ($parsedOptions as $token) {
+    preg_match('/--([^=]+)(=)?(.*)/', $token, $match);
+
+    if (! $match) {
+        continue;
+    }
+
+    $name = $match[1];
+    $equals = $match[2] ?? false;
+    $value = $match[3] ?? false;
+
+    $optionExists = array_key_exists($name, $commandLineVars);
+
+    if ($optionExists && ($value || $equals)) {
+        $commandLineVars[$name] = $commandLineVars[$name] ?? [];
+        $commandLineVars[$name] = Arr::wrap($commandLineVars[$name]);
+        $commandLineVars[$name][] = $value;
+    } elseif ($value) {
+        $commandLineVars[$name] = $value;
+    } elseif (! $optionExists) {
+        $commandLineVars[$name] =  ($value == '' && $equals) ? '' : true;
+    } 
+}
+
+/*
+|--------------------------------------------------------------------------
+| Prepare workspace for template render and gather variables
+|--------------------------------------------------------------------------
+*/
+@mkdir('state');
+@mkdir('rendered');
+$finder = (new Finder);
+$engine = new Blade(new Container, new Filesystem);
+$files = $finder->files()->in('templates')->ignoreDotFiles(false);
+
+$variablesFromJsonFile = json_decode(file_get_contents('variables.json'), true);
+// load variables 
+$variables = array_merge(
+    // load env variables
+    Dotenv::parse(file_get_contents('.env')), 
+    // variables from the .larawind/variables.json
+    $variablesFromJsonFile,
+    // then variables from command line passed to this script.
+    $commandLineVars
+);
+
+$force = $variables['force'] ?? false;
+
+if(array_key_exists('force', $variables)){
+    unset($variables['force']);
+}
+$latestVariableHash = sha1(json_encode($variables));
+
+
+/*
+|--------------------------------------------------------------------------
+| Compute docker image variables from the available dockerfiles so user 
+| doesnt have to explictly set it in their variables.json files.
+|--------------------------------------------------------------------------
+*/
+$finder = (new Finder);
+$dockerFiles = $finder->files()->in('templates/dockerfiles')->name('*.*.Dockerfile');
+$namespace = $variables['docker_tag_namespace'];
+foreach($dockerFiles as $dockerFile){
+    $parts = explode('.', $dockerFile->getBaseName());
+    $image = strtolower($parts[0]);
+    $version = strtolower($parts[1]);
+    // save as snake case so it can be normalized to camel properly.
+    $variables["{$image}_image"] = "$namespace/$image:$version"; 
+}
+
+/*
+|--------------------------------------------------------------------------
+| Since command line options are accepted to overwrite variables and
+| php doesnt support kebab/slug cased variable names, which is often the 
+| convention for command line option names, normalize variables to camel case. 
+|--------------------------------------------------------------------------
+*/
+foreach ($variables as $k => $value) {
+    $variables[Str::camel(strtolower($k))] = $value;
+}
+
+// dump out variables for inspection if desired.
+if($variables['inspectVars'] ?? false){
+    info("Dumping out vars:");
+    unset($variables['inspectVars']);
+    dd($variables);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Finally, render and save the templates to .larawind/rendered and save 
+| the latest state json files for subsequent runs to utilize.
+|--------------------------------------------------------------------------
+*/
+info("Processing templates" . ($force ? " by force:" : ":"));
+
+foreach($files as $file){
+    $relative = Str::after($path = $file->getPathName(), 'templates/');
+
+    $currentHash = sha1_file($path);
+    $previousHash = $savedHashes[$relative] ?? null;
+    $latestHashes[$relative] = $currentHash;
+
+    $renderedPath = "rendered/$relative";
+    $hasSumChanges = ($previousVariableHash && $previousVariableHash !== $latestVariableHash) || ($currentHash != $previousHash);
+
+    if(! is_file($renderedPath) ||  $force  || $hasSumChanges){
+        $changes = true;
+
+        @mkdir(dirname($renderedPath), recursive: true);
+
+        $contents = $engine->compile($path, $variables);
+        info("Rendered .larawind/$renderedPath");
+        file_put_contents($renderedPath, $contents);
+    }
+}
+
+if(!$changes){
+    warning("No changes detected, no renders required.");
+}
+
+// write state
+file_put_contents('state/variable-sum.json', json_encode(['sum'=>$latestVariableHash], JSON_PRETTY_PRINT));
+file_put_contents('state/render-sums.json', json_encode($latestHashes, JSON_PRETTY_PRINT));
+

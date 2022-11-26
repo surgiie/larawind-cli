@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -e
+
+mkdir -p $(larawind_path state)
+
+state_vars=$(get_set_variables_file)
+state_vars=$(insert_json "$state_vars" "${args[name]}" "${args[value]}")
+
+info "Set ${args[name]} state variable to ${args[value]}"
+
+echo "$state_vars" > $(larawind_path state/variables.json)
+
+set +e

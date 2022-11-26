@@ -1,0 +1,6 @@
+name: artisan
+help: Proxy a artisan command to the app container.
+filename: commands/artisan
+catch_all: "Arbitrary options for the artisan."
+filters:
+  - is_laravel_root

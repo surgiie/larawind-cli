@@ -1,0 +1,14 @@
+name: exec
+help: Exec command to the a larawind container.
+filename: commands/exec
+catch_all: "Arbitrary command and options for the exec."
+filters:
+  - is_laravel_root
+args:
+  - name: container
+    default: app
+flags:
+  - long: --cmd
+    arg: cmd
+    help: The command to exec.
+    default: bash

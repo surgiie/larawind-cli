@@ -1,0 +1,32 @@
+
+#!/bin/bash
+
+# This script is called before `larawind up` does anything.
+set -e
+
+domain="$(get_variable domain)"
+ssl_local_directory=".larawind/rendered/nginx/ssl"
+cert_path="$ssl_local_directory/live/$domain"
+
+mkdir -p $cert_path
+
+# generate dhparams for nginx site conf and local ssl, remove as needed.
+if [ ! -f "$ssl_local_directory/ssl-dhparams.pem" ];
+then 
+    info "Generating initial ssl dhparams for nginx ssl conf options.."
+    openssl dhparam -out "$ssl_local_directory/ssl-dhparams.pem" 4096
+    info "Generated ssl dhparams for nginx conf at: $ssl_local_directory"
+fi
+
+# local ssl cert to allow container startup if a cert doesnt already exist for the out of box nginx https configuration, remove as needed.
+if [ ! -f "$cert_path/privkey.pem" ] && [ ! -f "$cert_path/fullchain.pem" ]; 
+then
+    subject="/CN=$domain/C=US/O=Larawind/OU=Development"
+    openssl genrsa -out $cert_path/privkey.pem 2048
+    openssl req -new -x509 -key $cert_path/privkey.pem -out $cert_path/fullchain.pem \
+        -days 3650 -subj "$subject" -extensions SAN -config <( \
+            printf "[req]\ndistinguished_name = req\n[SAN]\nsubjectAltName=DNS:$domain"
+        )
+                
+    info "Generated local ssl cert for container startup."
+fi
