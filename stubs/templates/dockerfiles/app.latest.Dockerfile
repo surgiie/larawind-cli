@@ -25,6 +25,7 @@ RUN apt-get update \
         php8.1-redis \
         php8.1-xml \
         php8.1-zip \
+        mysql-client \
     && curl -sL https://deb.nodesource.com/setup_18.x | bash - \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
     && apt-get -y --no-install-recommends install nodejs \
