@@ -961,7 +961,7 @@ larawind_exec_command() {
 
   info "Running '$cmd' on $container:"
 
-  docker exec -i ${USE_TTY} $container $cmd
+  docker exec -i ${USE_TTY} $container sh -c "$cmd"
 
   set +e
 }
