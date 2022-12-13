@@ -1,6 +1,6 @@
 # Larawind CLI
 
-A bash cli for running laravel docker applications with blade rendered configurations.
+A mostly bash cli for running laravel docker applications with blade rendered configurations.
 
 ### Install
 
