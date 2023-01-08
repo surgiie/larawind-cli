@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # This script is called before `larawind up` does anything.
