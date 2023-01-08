@@ -1,0 +1,12 @@
+name: make
+help: Generate a file or resource that is provided by this cli.
+filename: commands/make
+dependencies:
+  - jq
+filters:
+  - is_laravel_root
+  - project_is_initialized
+  - templates_are_rendered
+flags:
+- long: --local-cert
+  help: Generate a local ssl cert and key in .larawind/rendered/nginx/ssl that can be used for nginx container locally.

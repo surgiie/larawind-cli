@@ -40,6 +40,7 @@ larawind_usage() {
   echo "  nuke           Kill .larawind project services and remove all associated resources."
   echo "  artisan        Proxy a artisan command to the app container."
   echo "  exec           Exec command to the a larawind container."
+  echo "  make           Generate a file or resource that is provided by this cli."
   echo "  set-variable   Set a state variable in the state/variables.json file."
   echo
 
@@ -355,6 +356,36 @@ larawind_exec_usage() {
     echo "  CONTAINER"
     printf "\n"
     printf "    Default: app\n"
+    echo
+
+  fi
+}
+
+larawind_make_usage() {
+  if [[ -n $long_usage ]]; then
+    printf "larawind make - Generate a file or resource that is provided by this cli.\n"
+    echo
+
+  else
+    printf "larawind make - Generate a file or resource that is provided by this cli.\n"
+    echo
+
+  fi
+
+  printf "Usage:\n"
+  printf "  larawind make [OPTIONS]\n"
+  printf "  larawind make --help | -h\n"
+  echo
+
+  if [[ -n $long_usage ]]; then
+    printf "Options:\n"
+
+    echo "  --help, -h"
+    printf "    Show this help\n"
+    echo
+
+    echo "  --local-cert"
+    printf "    Generate a local ssl cert in .larawind/rendered/nginx/ssl that can be used\n    for nginx container locally.\n"
     echo
 
   fi
@@ -966,6 +997,49 @@ larawind_exec_command() {
   set +e
 }
 
+larawind_make_command() {
+  #!/usr/bin/env bash
+  set -e
+  domain="$(get_variable domain)"
+
+  if [ ${#args[@]} == 0 ]
+  then
+      error "No flag option given, see --help for options."
+  fi
+  # generate a self signed ssl cert in local dev.
+  if [[ ${args[--local-cert]} == 1 ]]
+
+  then
+      ssl_local_directory=".larawind/rendered/nginx/ssl"
+      cert_path="$ssl_local_directory/live/$domain"
+
+      mkdir -p $cert_path
+      # generate dhparams for nginx site conf and local ssl, remove as needed.
+      if [ ! -f "$ssl_local_directory/ssl-dhparams.pem" ];
+      then
+
+          info "Generating ssl dhparams for nginx ssl conf options, this will take a while:"
+          openssl dhparam -out "$ssl_local_directory/ssl-dhparams.pem" 4096 &> /dev/null
+          info "Generated ssl dhparams for nginx conf at: $ssl_local_directory"
+      fi
+      # local ssl cert to allow container startup if a cert doesnt already exist for the out of box nginx https configuration, remove as needed.
+      if [ ! -f "$cert_path/privkey.pem" ] && [ ! -f "$cert_path/fullchain.pem" ];
+
+      then
+          subject="/CN=$domain/C=US/O=Larawind/OU=Development"
+          openssl genrsa -out $cert_path/privkey.pem 2048
+          openssl req -new -x509 -key $cert_path/privkey.pem -out $cert_path/fullchain.pem \
+              -days 90 -subj "$subject" -extensions SAN -config <( \
+                  printf "[req]\ndistinguished_name = req\n[SAN]\nsubjectAltName=DNS:$domain"
+              )
+
+          info "Generated local ssl cert for container startup."
+      fi
+  fi
+
+  set +e
+}
+
 larawind_set_variable_command() {
   #!/usr/bin/env bash
   set -e
@@ -1071,6 +1145,13 @@ parse_requirements() {
     action="exec"
     shift
     larawind_exec_parse_requirements "$@"
+    shift $#
+    ;;
+
+  make )
+    action="make"
+    shift
+    larawind_make_parse_requirements "$@"
     shift $#
     ;;
 
@@ -1694,6 +1775,69 @@ larawind_exec_parse_requirements() {
 
 }
 
+larawind_make_parse_requirements() {
+
+  case "${1:-}" in
+  --help | -h )
+    long_usage=yes
+    larawind_make_usage
+    exit
+    ;;
+
+  esac
+
+  if ! [[ -x "$(command -v jq)" ]]; then
+    printf "missing dependency: jq\n" >&2
+    exit 1
+  fi
+
+  action="make"
+
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    case "$key" in
+
+    --local-cert )
+
+      args[--local-cert]=1
+      shift
+      ;;
+
+    -?* )
+      printf "invalid option: %s\n" "$key" >&2
+      exit 1
+      ;;
+
+    * )
+
+      printf "invalid argument: %s\n" "$key" >&2
+      exit 1
+
+      ;;
+
+    esac
+  done
+
+  filter_error=$(filter_is_laravel_root)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_project_is_initialized)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+  filter_error=$(filter_templates_are_rendered)
+  if [[ -n $filter_error ]]; then
+    echo "$filter_error" >&2
+    exit 1
+  fi
+
+}
+
 larawind_set_variable_parse_requirements() {
 
   case "${1:-}" in
@@ -1853,6 +1997,14 @@ run() {
       larawind_exec_usage
     else
       larawind_exec_command
+    fi
+
+  elif [[ $action == "make" ]]; then
+    if [[ ${args[--help]:-} ]]; then
+      long_usage=yes
+      larawind_make_usage
+    else
+      larawind_make_command
     fi
 
   elif [[ $action == "set-variable" ]]; then

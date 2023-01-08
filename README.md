@@ -24,10 +24,10 @@ PATH=$PATH:/usr/local/bin/larawind-cli/larawind
 
 To create a `.larawind` directory within the root of your project, run `larawind init`. This is the workspace your template files will exist and where the cli will work in.
 
+If you plan to use a local self signed cert for local dev run `larawind make --local-cert` otherwise, remove any ssl options from `.larawind/templates/conf.d/site.conf` and or ssl volume bindings in `.larawind/templates/compose/*.yaml` files.
 ## Customize 
 
-At this point you should customize `.larawind/variables.json` and `.larawind/templates` to liking.
-
+At this point you should customize `.larawind/variables.json` and `.larawind/templates` to liking. 
 
 ## Template Variables & Rendering Templates
 

@@ -11,5 +11,6 @@ commands:
   - import: app/config/nuke.yml
   - import: app/config/artisan.yml
   - import: app/config/exec.yml
+  - import: app/config/make.yml
   - import: app/config/set-variable.yml
 

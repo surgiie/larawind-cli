@@ -1,14 +1,13 @@
-#!/bin/bash
-
-# This script is called before `larawind up` does anything.
+#!/usr/bin/env bash
 set -e
-
-env="$(get_variable env)"
 domain="$(get_variable domain)"
 
-
+if [ ${#args[@]} == 0 ]
+then
+    error "No flag option given, see --help for options."
+fi
 # generate a self signed ssl cert in local dev.
-if [ $env == "local" ] 
+if [[ ${args[--local-cert]} == 1 ]] 
 then
     ssl_local_directory=".larawind/rendered/nginx/ssl"
     cert_path="$ssl_local_directory/live/$domain"
@@ -17,9 +16,9 @@ then
     # generate dhparams for nginx site conf and local ssl, remove as needed.
     if [ ! -f "$ssl_local_directory/ssl-dhparams.pem" ];
     then 
-        info "Generating initial ssl dhparams for nginx ssl conf options.."
-        openssl dhparam -out "$ssl_local_directory/ssl-dhparams.pem" 4096
-        info "Generated ssl dhparams for nginx conf at: $ssl_local_directory"
+        info "Generating ssl dhparams for nginx ssl conf options, this will take a while:"
+        openssl dhparam -out "$ssl_local_directory/ssl-dhparams.pem" 4096 &> /dev/null
+        info "Generated ssl dhparams for nginx conf at: $ssl_local_directory/ssl-dhparams.pem"
     fi
     # local ssl cert to allow container startup if a cert doesnt already exist for the out of box nginx https configuration, remove as needed.
     if [ ! -f "$cert_path/privkey.pem" ] && [ ! -f "$cert_path/fullchain.pem" ]; 
@@ -31,7 +30,9 @@ then
                 printf "[req]\ndistinguished_name = req\n[SAN]\nsubjectAltName=DNS:$domain"
             )
                     
-        info "Generated local ssl cert for container startup."
+        info "Generated local ssl cert and key for containers to use via volume at: $cert_path"
     fi
 fi 
 
+
+set +e
