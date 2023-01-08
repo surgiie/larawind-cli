@@ -1,4 +1,5 @@
 {
+    "env": "local",
     "domain": "larawind.local",
     "docker_tag_namespace": "larawind",
     "docker_username": "larawind",
