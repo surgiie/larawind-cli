@@ -385,7 +385,7 @@ larawind_make_usage() {
     echo
 
     echo "  --local-cert"
-    printf "    Generate a local ssl cert in .larawind/rendered/nginx/ssl that can be used\n    for nginx container locally.\n"
+    printf "    Generate a local ssl cert and key in .larawind/rendered/nginx/ssl that can\n    be used for nginx container locally.\n"
     echo
 
   fi
@@ -1020,7 +1020,7 @@ larawind_make_command() {
 
           info "Generating ssl dhparams for nginx ssl conf options, this will take a while:"
           openssl dhparam -out "$ssl_local_directory/ssl-dhparams.pem" 4096 &> /dev/null
-          info "Generated ssl dhparams for nginx conf at: $ssl_local_directory"
+          info "Generated ssl dhparams for nginx conf at: $ssl_local_directory/ssl-dhparams.pem"
       fi
       # local ssl cert to allow container startup if a cert doesnt already exist for the out of box nginx https configuration, remove as needed.
       if [ ! -f "$cert_path/privkey.pem" ] && [ ! -f "$cert_path/fullchain.pem" ];
@@ -1033,7 +1033,7 @@ larawind_make_command() {
                   printf "[req]\ndistinguished_name = req\n[SAN]\nsubjectAltName=DNS:$domain"
               )
 
-          info "Generated local ssl cert for container startup."
+          info "Generated local ssl cert and key for containers to use via volume at: $cert_path"
       fi
   fi
 
